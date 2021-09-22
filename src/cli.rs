@@ -23,6 +23,25 @@ pub fn build_cli() -> App<'static, 'static> {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("import")
+                .alias("i")
+                .about("Import from other formats")
+                .arg(
+                    Arg::with_name("format")
+                        .short("f")
+                        .long("format")
+                        .help("The format of the file to import")
+                        .takes_value(true)
+                        .required(true)
+                        .possible_values(&[
+                            "mochi",
+                            // "anki", // TODO: Support anki import
+                        ]),
+                )
+                .arg(Arg::with_name("PATH").index(1).required(true))
+                .arg(Arg::with_name("OUT_DIR").index(2).required(true)),
+        )
+        .subcommand(
             SubCommand::with_name("notes")
                 .alias("n")
                 .about("Handle notes")

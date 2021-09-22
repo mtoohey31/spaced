@@ -3,12 +3,11 @@
 // TODO: Determine how error enums should be structured
 // TODO: Add comments to a bunch of stuff, and look into how to properly document rust functions
 // TODO: Support day turnover after midnight
-// TODO: Support anki and mochi imports, with review history if possible
-// (https://github.com/zip-rs/zip/blob/7edf2489d5cff8b80f02ee6fc5febf3efd0a9442/examples/extract.rs, https://crates.io/crates/edn-rs)
 use serde_yaml::Value;
 use std::cell::RefCell;
 use std::fs::metadata;
 use std::io::{self, Write};
+use std::path::Path;
 use std::time::SystemTime;
 use termion::{
     color,
@@ -31,15 +30,17 @@ mod algorithms;
 mod cards;
 mod cli;
 mod frontmatter;
+mod import;
 mod notes;
 
 fn main() {
     let matches = cli::build_cli().get_matches();
     match matches.subcommand_name() {
         Some("cards") => cards(matches.subcommand_matches("cards")),
+        Some("import") => import(matches.subcommand_matches("import").unwrap()), // Can be unwrapped safely because clap will ensure the format argument is present
         Some("notes") => notes(matches.subcommand_matches("notes")),
         Some("review") | None => review(matches.subcommand_matches("review")),
-        _ => {} // Cannot occur since no other subcommands are specified in ../cli.yaml
+        _ => panic!(), // Cannot occur since no other subcommands are specified in ../cli.yaml
     }
 }
 
@@ -125,6 +126,19 @@ fn cards_clear_history(matches: Option<&clap::ArgMatches>) {
                 Err(e) => panic!("{}", e),
             };
         }
+    }
+}
+
+fn import(matches: &clap::ArgMatches) {
+    match matches.value_of("format").unwrap() {
+        "mochi" => {
+            import::import_mochi(
+                &Path::new(matches.value_of("PATH").unwrap()),
+                &Path::new(matches.value_of("OUT_DIR").unwrap()),
+            )
+            .unwrap();
+        }
+        _ => panic!(), // Can't happen because clap will ensure one of the previous options is present
     }
 }
 
