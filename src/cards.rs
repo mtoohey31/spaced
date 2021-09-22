@@ -89,7 +89,7 @@ fn read_review_history(path: &Path) -> Result<Vec<(Date<Utc>, bool)>, ReviewHist
         Value::Sequence(sequence) => {
             let mut review_history = Vec::new();
             for map in sequence {
-                let datetime = match map.get("datetime") {
+                let date = match map.get("date") {
                     Some(value) => match value {
                         Value::String(string) => Date::from_utc(
                             match NaiveDate::parse_from_str(string, "%Y-%m-%d") {
@@ -109,7 +109,7 @@ fn read_review_history(path: &Path) -> Result<Vec<(Date<Utc>, bool)>, ReviewHist
                     },
                     None => return Err(ReviewHistoryError::ValueError),
                 };
-                review_history.push((datetime, remembered));
+                review_history.push((date, remembered));
             }
             Ok(review_history)
         }
@@ -175,7 +175,7 @@ fn get_review_item(remembered: bool) -> serde_yaml::Value {
     let mut mapping = serde_yaml::Mapping::new();
     let today = Utc::today().format("%Y-%m-%d").to_string();
     mapping.insert(
-        Value::String(String::from("datetime")),
+        Value::String(String::from("date")),
         serde_yaml::Value::String(today),
     );
     mapping.insert(
