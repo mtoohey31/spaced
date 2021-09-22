@@ -1,12 +1,9 @@
 // TODO: Display errors to users instead of panicking
 // TODO: Add comments to a bunch of stuff, and look into how to properly document rust functions
 // TODO: Add vim config snippet to fold frontmatter to docs
+// TODO: Support day turnover after midnight
 // TODO: Support anki and mochi imports, with review history if possible
 // (https://github.com/zip-rs/zip/blob/7edf2489d5cff8b80f02ee6fc5febf3efd0a9442/examples/extract.rs, https://crates.io/crates/edn-rs)
-extern crate clap;
-use clap::App;
-use clap::Arg;
-use clap::SubCommand;
 use serde_yaml::Value;
 use std::cell::RefCell;
 use std::fs::metadata;
@@ -31,61 +28,12 @@ use walkdir::DirEntry;
 
 mod algorithms;
 mod cards;
+mod cli;
 mod frontmatter;
 mod notes;
 
 fn main() {
-    let matches = App::new("spaced")
-        .version("0.1.0")
-        .author("mtoohey31 <mtoohey31@users.noreply.github.com>")
-        .about("Spaced repetition in YAML")
-        .subcommand(
-            SubCommand::with_name("cards")
-                .alias("c")
-                .about("Handle cards")
-                .subcommand(
-                    SubCommand::with_name("clear-history")
-                        .alias("c")
-                        .about("Clear review history")
-                        .arg(
-                            Arg::with_name("no-confirm")
-                                .short("y")
-                                .long("no-confirm")
-                                .help("Do not ask for confirmation"),
-                        )
-                        .arg(Arg::with_name("PATH").index(1)),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("notes")
-                .alias("n")
-                .about("Handle notes")
-                .arg(
-                    Arg::with_name("all")
-                        .short("a")
-                        .long("all")
-                        .help("Show all notes"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("review")
-                .alias("r")
-                .about("Review cards")
-                .arg(
-                    Arg::with_name("algorithm")
-                        .short("a")
-                        .long("algorithm")
-                        .takes_value(true)
-                        .possible_values(&[
-                            "all",
-                            "leitner",
-                            // "half-life" // duolingo
-                            // "super-memo"
-                        ]),
-                )
-                .arg(Arg::with_name("PATHS").index(1)),
-        )
-        .get_matches();
+    let matches = cli::build_cli().get_matches();
     match matches.subcommand_name() {
         Some("cards") => cards(matches.subcommand_matches("cards")),
         Some("notes") => notes(matches.subcommand_matches("notes")),
