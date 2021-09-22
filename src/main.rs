@@ -1,6 +1,7 @@
 // TODO: Display errors to users instead of panicking
+// TODO: Try and make clap lock down the types of arguments, such as paths, etc.
+// TODO: Determine how error enums should be structured
 // TODO: Add comments to a bunch of stuff, and look into how to properly document rust functions
-// TODO: Add vim config snippet to fold frontmatter to docs
 // TODO: Support day turnover after midnight
 // TODO: Support anki and mochi imports, with review history if possible
 // (https://github.com/zip-rs/zip/blob/7edf2489d5cff8b80f02ee6fc5febf3efd0a9442/examples/extract.rs, https://crates.io/crates/edn-rs)

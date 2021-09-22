@@ -16,7 +16,7 @@ impl fmt::Display for FrontmatterError {
         match self {
             FrontmatterError::IOError(e) => e.fmt(f),
             FrontmatterError::YAMLError(e) => e.fmt(f),
-            FrontmatterError::ValueError => write!(f, "ValueError"),
+            FrontmatterError::ValueError => write!(f, "ValueError"), // TODO: Determine how this should be formatted
         }
     }
 }

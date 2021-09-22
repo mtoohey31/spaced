@@ -20,7 +20,7 @@ impl fmt::Display for ReviewHistoryError {
         match self {
             ReviewHistoryError::FrontmatterError(e) => e.fmt(f),
             ReviewHistoryError::DateParseError(e) => e.fmt(f),
-            ReviewHistoryError::ValueError => write!(f, "ValueError"),
+            ReviewHistoryError::ValueError => write!(f, "ValueError"), // TODO: Determine how this should be formatted
         }
     }
 }
@@ -149,7 +149,6 @@ pub fn mark(path: &Path, remembered: bool) {
     }
 }
 
-// TODO: Extract this to cards
 pub fn unmark(path: &Path) {
     let (mut mapping, body) = match frontmatter::read_fm_and_body(path) {
         Ok(fm) => fm,
