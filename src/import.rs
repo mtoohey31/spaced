@@ -70,6 +70,7 @@ struct Card<'a> {
     body: &'a str,
 }
 
+// TODO: Support media files
 pub fn import_mochi(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
     let file = match File::open(path) {
         Ok(f) => f,
