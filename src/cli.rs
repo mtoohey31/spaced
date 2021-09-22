@@ -49,6 +49,6 @@ pub fn build_cli() -> App<'static, 'static> {
                             // "super-memo"
                         ]),
                 )
-                .arg(Arg::with_name("PATHS").index(1)),
+                .arg(Arg::with_name("PATH").index(1)),
         )
 }
