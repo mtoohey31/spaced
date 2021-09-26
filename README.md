@@ -2,6 +2,8 @@
 
 Command line, spaced repetition software using markdown.
 
+![screenshot](https://user-images.githubusercontent.com/36740602/134814105-44cbda7e-5dd2-4c90-a480-7aab2d0b5731.png)
+
 ## Usage
 
 ```sh
