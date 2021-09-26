@@ -3,6 +3,7 @@
 // TODO: Determine how error enums should be structured
 // TODO: Add comments to a bunch of stuff, and look into how to properly document rust functions
 // TODO: Support day turnover after midnight
+// TODO: Package for AUR
 use serde_yaml::Value;
 use std::cell::RefCell;
 use std::fs::metadata;
