@@ -132,7 +132,14 @@ fn cards_clear_history(matches: Option<&clap::ArgMatches>) {
 fn import(matches: &clap::ArgMatches) {
     match matches.value_of("format").unwrap() {
         "mochi" => {
-            import::import_mochi(
+            import::mochi(
+                &Path::new(matches.value_of("PATH").unwrap()),
+                &Path::new(matches.value_of("OUT_DIR").unwrap()),
+            )
+            .unwrap();
+        }
+        "anki" => {
+            import::anki(
                 &Path::new(matches.value_of("PATH").unwrap()),
                 &Path::new(matches.value_of("OUT_DIR").unwrap()),
             )

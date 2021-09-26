@@ -33,10 +33,7 @@ pub fn build_cli() -> App<'static, 'static> {
                         .help("The format of the file to import")
                         .takes_value(true)
                         .required(true)
-                        .possible_values(&[
-                            "mochi",
-                            // "anki", // TODO: Support anki import
-                        ]),
+                        .possible_values(&["mochi", "anki"]),
                 )
                 .arg(Arg::with_name("PATH").index(1).required(true))
                 .arg(Arg::with_name("OUT_DIR").index(2).required(true)),

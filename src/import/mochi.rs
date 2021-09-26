@@ -1,77 +1,58 @@
+use super::{Card, Deck, ImportError};
 use crate::frontmatter;
-use chrono::{Date, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fmt;
-use std::fs::{create_dir, File};
+use std::fs::create_dir;
+use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-#[derive(Debug)]
-pub enum ImportError {
-    IOError(std::io::Error),
-    FrontmatterError(frontmatter::FrontmatterError),
-    ZipError(zip::result::ZipError),
-    JSONError(serde_json::Error),
-    ParseError(std::num::ParseIntError),
-    ValueError,
-}
-
-impl fmt::Display for ImportError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ImportError::IOError(e) => e.fmt(f),
-            ImportError::FrontmatterError(e) => e.fmt(f),
-            ImportError::ZipError(e) => e.fmt(f),
-            ImportError::JSONError(e) => e.fmt(f),
-            ImportError::ParseError(e) => e.fmt(f),
-            ImportError::ValueError => write!(f, "ValueError"), // TODO: Determine how this should be formatted
-        }
-    }
-}
-
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-struct Deck<'a> {
-    name: &'a str,
-    cards: Vec<Card<'a>>,
-    children: Vec<Deck<'a>>,
-}
-
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-struct ChildDeck<'a> {
+struct ParentDeck<'a> {
     deck: Deck<'a>,
-    parent_id: &'a str,
+    children: Vec<ParentDeck<'a>>,
 }
 
-impl<'a> std::ops::Deref for ChildDeck<'a> {
+impl<'a> std::ops::Deref for ParentDeck<'a> {
     type Target = Deck<'a>;
     fn deref(&self) -> &Self::Target {
         &self.deck
     }
 }
 
-impl<'a> std::ops::DerefMut for ChildDeck<'a> {
+impl<'a> std::ops::DerefMut for ParentDeck<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.deck
     }
 }
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+struct ChildDeck<'a> {
+    parent_deck: ParentDeck<'a>,
+    parent_id: &'a str,
+}
 
-impl<'a> ChildDeck<'a> {
-    fn into_deck(self) -> Deck<'a> {
-        self.deck
+impl<'a> std::ops::Deref for ChildDeck<'a> {
+    type Target = ParentDeck<'a>;
+    fn deref(&self) -> &Self::Target {
+        &self.parent_deck
     }
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-struct Card<'a> {
-    created: Date<Utc>,
-    updated: Date<Utc>,
-    reviews: serde_yaml::Value,
-    body: &'a str,
+impl<'a> std::ops::DerefMut for ChildDeck<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.parent_deck
+    }
+}
+
+impl<'a> ChildDeck<'a> {
+    fn into_deck(self) -> ParentDeck<'a> {
+        self.parent_deck
+    }
 }
 
 // TODO: Support media files
-pub fn import_mochi(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
+pub fn import(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
     let file = match File::open(path) {
         Ok(f) => f,
         Err(e) => return Err(ImportError::IOError(e)),
@@ -151,9 +132,11 @@ pub fn import_mochi(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
             child_decks.insert(
                 id,
                 ChildDeck {
-                    deck: Deck {
-                        name: name,
-                        cards: cards,
+                    parent_deck: ParentDeck {
+                        deck: Deck {
+                            name: name,
+                            cards: cards,
+                        },
                         children: vec![],
                     },
                     parent_id: parent_id,
@@ -162,9 +145,11 @@ pub fn import_mochi(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
         } else {
             root_decks.insert(
                 id,
-                Deck {
-                    name: name,
-                    cards: cards,
+                ParentDeck {
+                    deck: Deck {
+                        name: name,
+                        cards: cards,
+                    },
                     children: vec![],
                 },
             );
@@ -194,7 +179,10 @@ pub fn import_mochi(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
         }
     }
 
-    write_decks(root_decks.into_values().collect::<Vec<Deck>>(), out_dir)
+    write_decks(
+        root_decks.into_values().collect::<Vec<ParentDeck>>(),
+        out_dir,
+    )
 }
 
 fn parse_cards(json_cards: &Vec<Value>) -> Result<Vec<Card>, ImportError> {
@@ -208,13 +196,13 @@ fn parse_cards(json_cards: &Vec<Value>) -> Result<Vec<Card>, ImportError> {
     Ok(cards)
 }
 
-fn parse_card<'a>(json_card: &'a Value) -> Result<Card<'a>, ImportError> {
+fn parse_card<'a>(json_card: &'a Value) -> Result<Card, ImportError> {
     let created = match json_card.get("~:created-at") {
         Some(v) => match v {
             Value::Object(o) => match o.get("~#dt") {
                 Some(v) => match v {
                     Value::Number(n) => match n.as_i64() {
-                        Some(i) => Utc::now().timezone().timestamp_millis(i).date(),
+                        Some(i) => Utc::now().timezone().timestamp_millis(i),
                         None => return Err(ImportError::ValueError),
                     },
                     _ => return Err(ImportError::ValueError),
@@ -230,7 +218,7 @@ fn parse_card<'a>(json_card: &'a Value) -> Result<Card<'a>, ImportError> {
             Value::Object(o) => match o.get("~#dt") {
                 Some(v) => match v {
                     Value::Number(n) => match n.as_i64() {
-                        Some(i) => Utc::now().timezone().timestamp_millis(i).date(),
+                        Some(i) => Utc::now().timezone().timestamp_millis(i),
                         None => return Err(ImportError::ValueError),
                     },
                     _ => return Err(ImportError::ValueError),
@@ -253,7 +241,7 @@ fn parse_card<'a>(json_card: &'a Value) -> Result<Card<'a>, ImportError> {
     };
     let body = match json_card.get("~:content") {
         Some(v) => match v {
-            Value::String(s) => s,
+            Value::String(s) => String::from(s),
             _ => return Err(ImportError::ValueError),
         },
         None => return Err(ImportError::ValueError),
@@ -283,7 +271,7 @@ fn parse_reviews(json_reviews: &Vec<Value>) -> Result<serde_yaml::Value, ImportE
                             Ok(i) => i,
                             Err(e) => return Err(ImportError::ParseError(e)),
                         };
-                        let date = Utc::now().timezone().timestamp_millis(i).date();
+                        let date = Utc::now().timezone().timestamp_millis(i);
                         serde_yaml::Value::String(date.format("%Y-%m-%d").to_string())
                     }
                     _ => return Err(ImportError::ValueError),
@@ -306,7 +294,7 @@ fn parse_reviews(json_reviews: &Vec<Value>) -> Result<serde_yaml::Value, ImportE
     Ok(serde_yaml::Value::Sequence(reviews))
 }
 
-fn write_decks(decks: Vec<Deck>, out_dir: &Path) -> Result<(), ImportError> {
+fn write_decks(decks: Vec<ParentDeck>, out_dir: &Path) -> Result<(), ImportError> {
     for deck in decks {
         let deck_out_dir = out_dir.join(deck.name);
         match create_dir(deck_out_dir.clone()) {
@@ -319,7 +307,7 @@ fn write_decks(decks: Vec<Deck>, out_dir: &Path) -> Result<(), ImportError> {
 
         let mut i = 0;
 
-        for card in deck.cards {
+        for card in deck.deck.cards {
             i += 1;
             let mut frontmatter = serde_yaml::Mapping::new();
             frontmatter.insert(
