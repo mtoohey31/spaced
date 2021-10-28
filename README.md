@@ -27,6 +27,7 @@ spaced cards clear-cards # equivalent
 spaced cards clear-cards --no-confirm
 
 spaced n
+spaced notes # equivalent
 
 spaced
 spaced r # equivalent
