@@ -1,5 +1,5 @@
 use super::{Card, Deck, ImportError};
-use crate::frontmatter;
+use crate::entities::frontmatter;
 use chrono::{TimeZone, Utc};
 use rusqlite::{params, Connection, OpenFlags, Result};
 use serde_yaml::{Mapping, Sequence, Value};

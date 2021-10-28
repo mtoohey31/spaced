@@ -1,5 +1,4 @@
-use crate::algorithms;
-use crate::frontmatter;
+use crate::entities::{algorithms, frontmatter};
 use chrono::format::ParseError;
 use chrono::{Date, NaiveDate, Utc};
 use serde_yaml::Value;

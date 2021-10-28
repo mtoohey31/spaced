@@ -1,4 +1,4 @@
-use crate::frontmatter::{read_fm, FrontmatterError};
+use crate::entities::frontmatter::{read_fm, FrontmatterError};
 use serde_yaml::Value;
 use std::ffi::OsStr;
 use std::path::{Component, Path};

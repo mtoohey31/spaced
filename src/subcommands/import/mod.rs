@@ -1,11 +1,12 @@
 mod anki;
 mod mochi;
 
-use crate::frontmatter;
-pub use anki::import as anki;
+use crate::entities::frontmatter;
 use chrono::{DateTime, Utc};
-pub use mochi::import as mochi;
 use std::fmt;
+
+use std::path::Path;
+
 
 #[derive(Debug)]
 pub enum ImportError {
@@ -44,4 +45,24 @@ struct Card {
     updated: DateTime<Utc>,
     reviews: serde_yaml::Value,
     body: String,
+}
+
+pub fn import(matches: &clap::ArgMatches) {
+    match matches.value_of("format").unwrap() {
+        "mochi" => {
+            mochi::import(
+                &Path::new(matches.value_of("PATH").unwrap()),
+                &Path::new(matches.value_of("OUT_DIR").unwrap()),
+            )
+            .unwrap();
+        }
+        "anki" => {
+            anki::import(
+                &Path::new(matches.value_of("PATH").unwrap()),
+                &Path::new(matches.value_of("OUT_DIR").unwrap()),
+            )
+            .unwrap();
+        }
+        _ => panic!(), // Can't happen because clap will ensure one of the previous options is present
+    }
 }
