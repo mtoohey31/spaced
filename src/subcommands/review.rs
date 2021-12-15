@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::io::{self};
+use std::io;
 use std::time::SystemTime;
 use termion::{
     event::Key,
@@ -21,6 +21,7 @@ use crate::entities::{cards, frontmatter};
 
 enum UndoItem {
     Mark(DirEntry, bool),
+    MarkArchived(DirEntry, bool),
     Skip,
 }
 
@@ -41,9 +42,10 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
         return;
     }
 
+    // TODO: refactor into atomic integers
     let remembered_cards = RefCell::new(0);
     let forgotten_cards = RefCell::new(0);
-    let curr_side = RefCell::new(1);
+    let curr_side = RefCell::new(0);
     let num_sides = RefCell::new(0);
 
     let start_time = SystemTime::now();
@@ -92,7 +94,10 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
                     let body = frontmatter::read_body(dir_entry.path()).unwrap();
                     let mut sides = body.split("\n---\n").collect::<Vec<&str>>();
                     *num_sides.borrow_mut() = sides.len();
-                    sides = sides.drain(0..*curr_side.borrow()).into_iter().collect();
+                    sides = sides
+                        .drain(0..(*curr_side.borrow() + 1))
+                        .into_iter()
+                        .collect();
                     // TODO: Parse markdown here
                     // TODO: Center markdown and be smart about where it breaks to keep borders on
                     // all sides as close to equal as possible
@@ -101,10 +106,10 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
                         .block(Block::default().borders(topbottomless));
 
                     let hint_string;
-                    if *curr_side.borrow() == *num_sides.borrow() {
-                        hint_string = "[f]orgot [space] remembered [l] skip [q]uit";
+                    if *curr_side.borrow() + 1 == *num_sides.borrow() {
+                        hint_string = "[f]orgot [space] remembered [l] skip [a]rchive [q]uit";
                     } else {
-                        hint_string = "[f]orgot [space] flip [l] skip [q]uit";
+                        hint_string = "[f]orgot [space] flip [l] skip [a]rchive [q]uit";
                     }
                     let hints = Paragraph::new(hint_string)
                         .block(Block::default().borders(topless))
@@ -125,15 +130,15 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
                     Key::Char('q') => break,
                     Key::Char('e') => {} // TODO: Implement this
                     Key::Char('l') => {
-                        *curr_side.borrow_mut() = 1;
+                        *curr_side.borrow_mut() = 0;
                         let card = cards.remove(0);
                         cards.push(card);
                         undo_stack.push(UndoItem::Skip);
                     }
                     Key::Char(' ') => {
-                        if *curr_side.borrow() == *num_sides.borrow() {
+                        if *curr_side.borrow() + 1 == *num_sides.borrow() {
                             cards::mark(cards[0].path(), true);
-                            *curr_side.borrow_mut() = 1;
+                            *curr_side.borrow_mut() = 0;
                             *remembered_cards.borrow_mut() += 1;
                             undo_stack.push(UndoItem::Mark(cards.remove(0), true));
                         } else {
@@ -142,9 +147,14 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
                     }
                     Key::Char('f') => {
                         cards::mark(cards[0].path(), false);
-                        *curr_side.borrow_mut() = 1;
+                        *curr_side.borrow_mut() = 0;
                         *forgotten_cards.borrow_mut() += 1;
                         undo_stack.push(UndoItem::Mark(cards.remove(0), false));
+                    }
+                    Key::Char('a') => {
+                        cards::mark_archived(cards[0].path(), true);
+                        *curr_side.borrow_mut() = 0;
+                        undo_stack.push(UndoItem::MarkArchived(cards.remove(0), false));
                     }
                     Key::Char('u') => match undo_stack.pop() {
                         Some(undo_item) => match undo_item {
@@ -156,6 +166,9 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
                                     *forgotten_cards.borrow_mut() -= 1;
                                 }
                                 cards.insert(0, entry);
+                            }
+                            UndoItem::MarkArchived(entry, archived) => {
+                                cards::mark_archived(entry.path(), !archived);
                             }
                             UndoItem::Skip => {
                                 let card = match cards.pop() {

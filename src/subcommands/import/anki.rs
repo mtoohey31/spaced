@@ -1,9 +1,11 @@
-use super::{Card, Deck, ImportError};
+use super::{Card, Deck};
 use crate::entities::frontmatter;
+use crate::error::ValueError as VE;
 use chrono::{TimeZone, Utc};
 use rusqlite::{params, Connection, OpenFlags, Result};
 use serde_yaml::{Mapping, Sequence, Value};
 use std::collections::HashMap;
+use std::error::Error;
 use std::fs::create_dir;
 use std::fs::File;
 use std::io::{prelude::*, Read};
@@ -13,88 +15,51 @@ use std::path::Path;
 struct Model {}
 
 // TODO: Support media files
-pub fn import(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
-    let file = match File::open(path) {
-        Ok(f) => f,
-        Err(e) => return Err(ImportError::IOError(e)),
-    };
-    let mut archive = match zip::ZipArchive::new(file) {
-        Ok(a) => a,
-        Err(e) => return Err(ImportError::ZipError(e)),
-    };
+pub fn import(path: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
+    let file = File::open(path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
     let mut collection;
     if archive.file_names().any(|s| s == "collection.anki21") {
-        collection = match archive.by_name("collection.anki21") {
-            Ok(c) => c,
-            Err(e) => return Err(ImportError::ZipError(e)),
-        };
+        collection = archive.by_name("collection.anki21")?;
     } else {
-        collection = match archive.by_name("collection.ank21") {
-            Ok(c) => c,
-            Err(e) => return Err(ImportError::ZipError(e)),
-        };
+        collection = archive.by_name("collection.anki2")?;
     }
     let mut bytes = Vec::new();
-    match collection.read_to_end(&mut bytes) {
-        Ok(_) => {}
-        Err(e) => return Err(ImportError::IOError(e)),
-    };
-    let mut tmp_file = match File::create("/tmp/collection") {
-        Ok(f) => f,
-        Err(e) => return Err(ImportError::IOError(e)),
-    };
-    match tmp_file.write_all(&bytes) {
-        Ok(_) => {}
-        Err(e) => return Err(ImportError::IOError(e)),
-    }
+    collection.read_to_end(&mut bytes)?;
+    let mut tmp_file = File::create("/tmp/collection")?;
+    tmp_file.write_all(&bytes)?;
 
-    let conn = match Connection::open_with_flags(
+    let conn = Connection::open_with_flags(
         "/tmp/collection",
         OpenFlags::SQLITE_OPEN_READ_ONLY
             | OpenFlags::SQLITE_OPEN_NO_MUTEX
             | OpenFlags::SQLITE_OPEN_SHARED_CACHE,
-    ) {
-        Ok(c) => c,
-        Err(e) => return Err(ImportError::RusqliteError(e)),
-    };
+    )?;
 
-    let mut statement = match conn.prepare("SELECT decks, models FROM col") {
-        Ok(s) => s,
-        Err(e) => return Err(ImportError::RusqliteError(e)),
-    };
+    let mut statement = conn.prepare("SELECT decks, models FROM col")?;
 
-    let (deck_info, deck_models) = match statement
+    // let (deck_info, deck_models) = match statement
+    //     .query_row::<(Result<String, _>, Result<String, _>), _, _>(params![], |row| {
+    //         Ok((row.get(0), row.get(1)))
+    //     }) {
+    //     Ok(r) => (
+    //         serde_json::from_str::<serde_json::Value>(&(r.0?))?
+    //             .as_object()
+    //             .ok_or(VE::new())?,
+    //         serde_json::from_str::<serde_json::Value>(&(r.1?))?
+    //             .as_object()
+    //             .ok_or(VE::new())?,
+    //     ),
+    //     Err(e) => return Err(Box::new(e)),
+    // };
+    let query_result = statement
         .query_row::<(Result<String, _>, Result<String, _>), _, _>(params![], |row| {
             Ok((row.get(0), row.get(1)))
-        }) {
-        Ok(r) => (
-            match serde_json::from_str::<serde_json::Value>(
-                &(match r.0 {
-                    Ok(v) => v,
-                    Err(e) => return Err(ImportError::RusqliteError(e)),
-                }),
-            ) {
-                Ok(json) => match json {
-                    serde_json::Value::Object(o) => o,
-                    _ => return Err(ImportError::ValueError),
-                },
-                Err(e) => return Err(ImportError::JSONError(e)),
-            },
-            match serde_json::from_str::<serde_json::Value>(
-                &(match r.1 {
-                    Ok(v) => v,
-                    Err(e) => return Err(ImportError::RusqliteError(e)),
-                }),
-            ) {
-                Ok(json) => match json {
-                    serde_json::Value::Object(o) => o,
-                    _ => return Err(ImportError::ValueError),
-                },
-                Err(e) => return Err(ImportError::JSONError(e)),
-            },
-        ),
-        Err(e) => return Err(ImportError::RusqliteError(e)),
-    };
+        })?;
+    let deck_info = serde_json::from_str::<serde_json::Value>(&(query_result.0?))?;
+    let deck_info = deck_info.as_object().ok_or(VE::new())?;
+    let deck_models = serde_json::from_str::<serde_json::Value>(&(query_result.1?))?;
+    let deck_models = deck_models.as_object().ok_or(VE::new())?;
     let mut models = HashMap::new();
     for _model in deck_models {
         models.insert("", Model {});
@@ -102,13 +67,11 @@ pub fn import(path: &Path, out_dir: &Path) -> Result<(), ImportError> {
     let mut decks = Vec::new();
     for (id, data) in deck_info.iter() {
         decks.push(Deck {
-            name: match data.get("name") {
-                Some(n) => match n {
-                    serde_json::Value::String(s) => s,
-                    _ => return Err(ImportError::ValueError),
-                },
-                None => return Err(ImportError::ValueError),
-            },
+            name: data
+                .get("name")
+                .ok_or(VE::new())?
+                .as_str()
+                .ok_or(VE::new())?,
             cards: get_cards(id, &conn, &models)?,
         })
     }
@@ -120,8 +83,8 @@ fn get_cards(
     did: &str,
     conn: &rusqlite::Connection,
     _models: &HashMap<&str, Model>,
-) -> Result<Vec<Card>, ImportError> {
-    let mut statement = match conn.prepare(
+) -> Result<Vec<Card>, Box<dyn Error>> {
+    let mut statement = conn.prepare(
         &(String::from(
             "SELECT cards.id, notes.flds, notes.mod
 FROM (SELECT * FROM cards WHERE cards.did=",
@@ -129,68 +92,47 @@ FROM (SELECT * FROM cards WHERE cards.did=",
             + ") as cards
 LEFT JOIN notes
 ON cards.nid=notes.id"),
-    ) {
-        Ok(s) => s,
-        Err(e) => return Err(ImportError::RusqliteError(e)),
-    };
+    )?;
 
-    let card_rows = match statement.query_map([], |row| Ok((row.get(0), row.get(1), row.get(2)))) {
-        Ok(r) => {
-            r.collect::<Vec<Result<(Result<isize, _>, Result<String, _>, Result<i64, _>), _>>>()
-        }
-        Err(e) => return Err(ImportError::RusqliteError(e)),
-    };
+    let card_rows = statement
+        .query_map([], |row| Ok((row.get(0), row.get(1), row.get(2))))?
+        .collect::<Vec<Result<(Result<isize, _>, Result<String, _>, Result<i64, _>), _>>>();
     let mut cards = Vec::new();
     for row in card_rows {
         let row = row.unwrap(); // Safe because we explicitly Ok'd the row in the query map
-        let id = match row.0 {
-            Ok(id) => id,
-            Err(e) => return Err(ImportError::RusqliteError(e)),
-        };
-        let body = match row.1 {
-            Ok(s) => s.split("\u{1f}").collect::<Vec<&str>>().join("\n\n---\n\n"),
-            Err(e) => return Err(ImportError::RusqliteError(e)),
-        };
-        let modified = match row.2 {
-            Ok(m) => m,
-            Err(e) => return Err(ImportError::RusqliteError(e)),
-        };
+        let id = row.0?;
+        let body = row
+            .1?
+            .split("\u{1f}")
+            .collect::<Vec<&str>>()
+            .join("\n\n---\n\n");
+        let modified = row.2?;
         cards.push(Card {
             created: Utc::now(),
             updated: Utc::now().timezone().timestamp_millis(modified * 1000),
             reviews: get_reviews(id, conn)?,
-            body: body,
+            body,
         });
     }
     Ok(cards)
 }
 
-fn get_reviews(cid: isize, conn: &rusqlite::Connection) -> Result<Value, ImportError> {
-    let mut statement = match conn.prepare(
+fn get_reviews(cid: isize, conn: &rusqlite::Connection) -> Result<Value, Box<dyn Error>> {
+    let mut statement = conn.prepare(
         &(String::from(
             "SELECT id, ease
 FROM revlog
 WHERE revlog.cid=",
         ) + &cid.to_string()),
-    ) {
-        Ok(s) => s,
-        Err(e) => return Err(ImportError::RusqliteError(e)),
-    };
-    let review_rows = match statement.query_map(params![], |row| Ok((row.get(0), row.get(1)))) {
-        Ok(r) => r.collect::<Vec<Result<(Result<i64, _>, Result<isize, _>), _>>>(),
-        Err(e) => return Err(ImportError::RusqliteError(e)),
-    };
+    )?;
+    let review_rows = statement
+        .query_map(params![], |row| Ok((row.get(0), row.get(1))))?
+        .collect::<Vec<Result<(Result<i64, _>, Result<isize, _>), _>>>();
     let mut reviews = Sequence::new();
-    for row in review_rows {
+    for row in review_rows.into_iter() {
         let row = row.unwrap(); // Safe because we explicitly Ok'd the row in the query map
-        let timestamp = match row.0 {
-            Ok(d) => d,
-            Err(e) => return Err(ImportError::RusqliteError(e)),
-        };
-        let ease = match row.0 {
-            Ok(d) => d,
-            Err(e) => return Err(ImportError::RusqliteError(e)),
-        };
+        let timestamp = row.0?;
+        let ease = timestamp.clone();
         let mut mapping = Mapping::new();
         mapping.insert(
             Value::String(String::from("date")),
@@ -211,18 +153,18 @@ WHERE revlog.cid=",
     Ok(Value::Sequence(reviews))
 }
 
-fn write_decks(decks: Vec<Deck>, out_dir: &Path) -> Result<(), ImportError> {
+fn write_decks(decks: Vec<Deck>, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     for deck in decks {
         let deck_out_dir = out_dir.join(deck.name);
         match create_dir(deck_out_dir.clone()) {
             Ok(_) => {}
             Err(e) => match e.raw_os_error() {
                 Some(17) => {}
-                _ => return Err(ImportError::IOError(e)),
+                _ => return Err(Box::new(e)),
             },
         }
 
-        let mut i = 0;
+        let mut i: i32 = 0;
 
         for card in deck.cards {
             i += 1;
@@ -232,14 +174,11 @@ fn write_decks(decks: Vec<Deck>, out_dir: &Path) -> Result<(), ImportError> {
                 card.reviews,
             );
 
-            match frontmatter::write_fm_and_body(
+            frontmatter::write_fm_and_body(
                 &deck_out_dir.join(String::from("card") + &i.to_string() + ".md"),
                 serde_yaml::Value::Mapping(frontmatter),
                 String::from(card.body),
-            ) {
-                Ok(_) => {}
-                Err(e) => return Err(ImportError::FrontmatterError(e)),
-            };
+            )?;
         }
     }
 

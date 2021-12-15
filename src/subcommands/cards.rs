@@ -1,7 +1,7 @@
-use serde_yaml::Value;
-use termion::{style, color};
 use crate::entities::frontmatter;
+use serde_yaml::Value;
 use std::io::{self, Write};
+use termion::{color, style};
 
 use crate::entities::cards;
 

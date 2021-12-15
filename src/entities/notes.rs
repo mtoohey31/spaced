@@ -1,5 +1,7 @@
-use crate::entities::frontmatter::{read_fm, FrontmatterError};
+use crate::entities::frontmatter::read_fm;
+use crate::error::ValueError;
 use serde_yaml::Value;
+use std::error::Error;
 use std::ffi::OsStr;
 use std::path::{Component, Path};
 use walkdir::{DirEntry, WalkDir};
@@ -20,7 +22,7 @@ pub fn get_notes(path: &str, all: bool) -> Vec<DirEntry> {
                             Some(extension_option) => match extension_option.to_str() {
                                 Some(extension) => {
                                     if extension == "md" {
-                                        if all || !spaced(entry.path()).unwrap() {
+                                        if all || !is_spaced(entry.path()).unwrap() {
                                             Some(entry)
                                         } else {
                                             None
@@ -45,13 +47,10 @@ pub fn get_notes(path: &str, all: bool) -> Vec<DirEntry> {
         .collect::<Vec<DirEntry>>()
 }
 
-pub fn spaced(path: &Path) -> Result<bool, FrontmatterError> {
+pub fn is_spaced(path: &Path) -> Result<bool, Box<dyn Error>> {
     match read_fm(path) {
-        Ok(fm) => match fm.get("spaced") {
-            Some(spaced) => match spaced {
-                Value::Bool(b) => Ok(*b),
-                _ => Err(FrontmatterError::ValueError),
-            },
+        Ok(fm) => match fm.get(&Value::String(String::from("spaced"))) {
+            Some(spaced) => spaced.as_bool().ok_or(Box::new(ValueError::new())),
             None => Ok(false),
         },
         Err(e) => Err(e),

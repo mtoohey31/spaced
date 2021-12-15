@@ -1,18 +1,20 @@
-// TODO: Display errors to users instead of panicking
-// TODO: Try and make clap lock down the types of arguments, such as paths, etc.
-// TODO: Determine how error enums should be structured
-// TODO: Add comments to a bunch of stuff, and look into how to properly document rust functions
-// TODO: Support day turnover after midnight
-// TODO: Display forgotten progress as red instead of green
-// TODO: Randomize question order
-// TODO: Display folder containing question
-// TODO: Prevent skip after flipping a card
-// TODO: Add automatic tests
-// TODO: Package for AUR
-// TODO: Display path when reviewing card
+// TODO: display errors to users instead of panicking
+// TODO: try and make clap lock down the types of arguments, such as paths, etc.
+// TODO: add comments to a bunch of stuff, and look into how to properly document rust functions
+// TODO: support day turnover after midnight
+// TODO: display forgotten progress as red instead of green
+// TODO: randomize question order within `cards` folders, but keep each separate folder in a chunk together, also, review questions that have already been seen that day after ones that haven't
+// TODO: display folder containing question
+// TODO: prevent skip after flipping a card
+// TODO: add automatic tests
+// TODO: package for AUR
+// TODO: display path when reviewing card
+// TODO: support `.spacedignore` files (this could be a separate crate if some else hasn't already done it)
+// TODO: support `.spacedhistory` for stats purposes
 
 mod cli;
 mod entities;
+mod error;
 mod subcommands;
 
 use subcommands::*;

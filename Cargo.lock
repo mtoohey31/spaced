@@ -419,6 +419,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "termion",
+ "try_map",
  "tui",
  "walkdir",
  "zip",
@@ -492,6 +493,12 @@ dependencies = [
  "wasi",
  "winapi",
 ]
+
+[[package]]
+name = "try_map"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb1626d07cb5c1bb2cf17d94c0be4852e8a7c02b041acec9a8c5bdda99f9d580"
 
 [[package]]
 name = "tui"

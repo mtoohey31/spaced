@@ -1,37 +1,9 @@
 mod anki;
 mod mochi;
 
-use crate::entities::frontmatter;
 use chrono::{DateTime, Utc};
-use std::fmt;
 
 use std::path::Path;
-
-
-#[derive(Debug)]
-pub enum ImportError {
-    IOError(std::io::Error),
-    FrontmatterError(frontmatter::FrontmatterError),
-    ZipError(zip::result::ZipError),
-    JSONError(serde_json::Error),
-    ParseError(std::num::ParseIntError),
-    RusqliteError(rusqlite::Error),
-    ValueError,
-}
-
-impl fmt::Display for ImportError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ImportError::IOError(e) => e.fmt(f),
-            ImportError::FrontmatterError(e) => e.fmt(f),
-            ImportError::ZipError(e) => e.fmt(f),
-            ImportError::JSONError(e) => e.fmt(f),
-            ImportError::ParseError(e) => e.fmt(f),
-            ImportError::RusqliteError(e) => e.fmt(f),
-            ImportError::ValueError => write!(f, "ValueError"), // TODO: Determine how this should be formatted
-        }
-    }
-}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Deck<'a> {
