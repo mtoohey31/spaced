@@ -52,6 +52,7 @@ fn cards_clear_history(matches: Option<&clap::ArgMatches>) {
         let _ = io::stdout().flush();
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
+            // TODO: use lowercase conversion here
             Ok(_) => match input.as_ref() {
                 "Y\n" | "y\n" | "YES\n" | "Yes\n" | "yes\n" => break,
                 "\n" | "N\n" | "n\n" | "NO\n" | "No\n" | "no\n" => return,
