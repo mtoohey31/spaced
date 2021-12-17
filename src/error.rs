@@ -3,7 +3,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct ValueError {
-    message: Option<&'static str>,
+    message: Option<String>,
 }
 
 impl ValueError {
@@ -11,7 +11,7 @@ impl ValueError {
         ValueError { message: None }
     }
 
-    pub fn from(message: &'static str) -> Self {
+    pub fn from(message: String) -> Self {
         ValueError {
             message: Some(message),
         }

@@ -14,7 +14,7 @@ struct Deck<'a> {
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Card {
     created: DateTime<Utc>,
-    updated: DateTime<Utc>,
+    // updated: DateTime<Utc>,
     reviews: serde_yaml::Value,
     body: String,
 }

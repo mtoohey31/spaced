@@ -95,7 +95,7 @@ ON cards.nid=notes.id"),
         let modified = row.2?;
         cards.push(Card {
             created: Utc::now(),
-            updated: Utc::now().timezone().timestamp_millis(modified * 1000),
+            // updated: Utc::now().timezone().timestamp_millis(modified * 1000),
             reviews: get_reviews(id, conn)?,
             body,
         });
