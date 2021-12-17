@@ -38,20 +38,6 @@ pub fn import(path: &Path, out_dir: &Path) -> Result<(), Box<dyn Error>> {
 
     let mut statement = conn.prepare("SELECT decks, models FROM col")?;
 
-    // let (deck_info, deck_models) = match statement
-    //     .query_row::<(Result<String, _>, Result<String, _>), _, _>(params![], |row| {
-    //         Ok((row.get(0), row.get(1)))
-    //     }) {
-    //     Ok(r) => (
-    //         serde_json::from_str::<serde_json::Value>(&(r.0?))?
-    //             .as_object()
-    //             .ok_or(VE::new())?,
-    //         serde_json::from_str::<serde_json::Value>(&(r.1?))?
-    //             .as_object()
-    //             .ok_or(VE::new())?,
-    //     ),
-    //     Err(e) => return Err(Box::new(e)),
-    // };
     let query_result = statement
         .query_row::<(Result<String, _>, Result<String, _>), _, _>(params![], |row| {
             Ok((row.get(0), row.get(1)))
