@@ -3,7 +3,7 @@ use clap::{App, Arg, SubCommand};
 pub fn build_cli() -> App<'static, 'static> {
     App::new("spaced")
         .version("0.1.0")
-        .author("mtoohey31 <contact@mtoohey.com>")
+        .author("Matthew Toohey <contact@mtoohey.com>")
         .about("Spaced repetition in YAML")
         .subcommand(
             SubCommand::with_name("cards")
