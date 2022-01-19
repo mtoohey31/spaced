@@ -52,7 +52,7 @@ pub fn build_cli() -> App<'static, 'static> {
                     Arg::with_name("edit")
                         .short("e")
                         .long("edit")
-                        .help("Run one of $VISUAL, $EDITOR, or vim (with precedence in that rder) on all notes"),
+                        .help("Run one of $VISUAL, $EDITOR, or vim (with precedence in that rder) on all notes, if any are found"),
                 ),
         )
         .subcommand(

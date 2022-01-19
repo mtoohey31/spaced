@@ -26,6 +26,10 @@ pub fn notes(matches: Option<&clap::ArgMatches>) {
         a_time.cmp(&b_time)
     });
 
+    if entries.len() == 0 {
+        return;
+    }
+
     if edit {
         Command::new(
             env::var("VISUAL").unwrap_or(env::var("EDITOR").unwrap_or(String::from("vim"))),
