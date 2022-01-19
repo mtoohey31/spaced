@@ -1,10 +1,15 @@
 use crate::entities::notes;
-use std::fs::metadata;
+use std::process::Command;
+use std::{env, fs::metadata};
 
 pub fn notes(matches: Option<&clap::ArgMatches>) {
-    let (path, all) = match matches {
-        Some(m) => (m.value_of("PATH").unwrap_or("."), m.is_present("all")),
-        _ => (".", false),
+    let (path, all, edit) = match matches {
+        Some(m) => (
+            m.value_of("PATH").unwrap_or("."),
+            m.is_present("all"),
+            m.is_present("edit"),
+        ),
+        _ => (".", false, false),
     };
 
     let mut entries = notes::get_notes(path, all);
@@ -21,7 +26,16 @@ pub fn notes(matches: Option<&clap::ArgMatches>) {
         a_time.cmp(&b_time)
     });
 
-    for entry in entries {
-        println!("{}", entry.path().display());
+    if edit {
+        Command::new(
+            env::var("VISUAL").unwrap_or(env::var("EDITOR").unwrap_or(String::from("vim"))),
+        )
+        .args(entries.iter().map(|e| e.path().as_os_str()))
+        .status()
+        .expect("failed to execute $VISUAL, $EDITOR, or vim command");
+    } else {
+        for entry in entries {
+            println!("{}", entry.path().display());
+        }
     }
 }

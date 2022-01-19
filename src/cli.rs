@@ -41,12 +41,18 @@ pub fn build_cli() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("notes")
                 .alias("n")
-                .about("Handle notes")
+                .about("Recursively list markdown files in the notes directory, omitting them if they contain they contain spaced: true in their frontmatter")
                 .arg(
                     Arg::with_name("all")
                         .short("a")
                         .long("all")
                         .help("Show all notes"),
+                )
+                .arg(
+                    Arg::with_name("edit")
+                        .short("e")
+                        .long("edit")
+                        .help("Run one of $VISUAL, $EDITOR, or vim (with precedence in that rder) on all notes"),
                 ),
         )
         .subcommand(
