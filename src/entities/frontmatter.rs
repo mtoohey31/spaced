@@ -75,5 +75,10 @@ pub fn write_body(path: &Path, body: String) -> Result<(), Box<dyn Error>> {
 pub fn write_fm_and_body(path: &Path, fm: Value, body: String) -> Result<(), Box<dyn Error>> {
     let mut file = File::create(path)?;
     let fm = serde_yaml::to_string(&fm)?;
-    Ok(write!(file, "{}---\n\n{}", fm, body)?)
+    Ok(write!(
+        file,
+        "{}---\n\n{}",
+        fm,
+        body.strip_prefix("\n").unwrap_or(&body)
+    )?)
 }
