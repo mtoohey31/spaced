@@ -17,6 +17,14 @@ Command line, spaced repetition software using markdown.
   - Please [open an issue](https://github.com/mtoohey31/spaced/issues/new) if you'd like to request an import format.
 - Undo!
 
+## Installation
+
+```sh
+cargo install --git https://github.com/mtoohey31/spaced
+```
+
+The import feature adds an extra ~73 dependencies for handling various file formats, so if you don't need it you can opt out by adding the `--no-default-features` flag to the install command.
+
 ## Usage
 
 ```sh

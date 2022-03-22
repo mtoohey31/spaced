@@ -11,6 +11,7 @@ impl ValueError {
         ValueError { message: None }
     }
 
+    #[cfg(feature = "import")]
     pub fn from(message: String) -> Self {
         ValueError {
             message: Some(message),

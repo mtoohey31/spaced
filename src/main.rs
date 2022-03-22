@@ -24,6 +24,7 @@ fn main() {
     let matches = cli::build_cli().get_matches();
     match matches.subcommand_name() {
         Some("cards") => cards(matches.subcommand_matches("cards")),
+        #[cfg(feature = "import")]
         Some("import") => import(matches.subcommand_matches("import").unwrap()), // Can be unwrapped safely because clap will ensure the format argument is present
         Some("notes") => notes(matches.subcommand_matches("notes")),
         Some("review") | None => review(matches.subcommand_matches("review")),

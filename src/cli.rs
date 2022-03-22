@@ -1,7 +1,11 @@
 use clap::{Arg, Command};
 
 pub fn build_cli() -> Command<'static> {
-    Command::new("spaced")
+    #[cfg(not(feature = "import"))]
+    let cmd;
+    #[cfg(feature = "import")]
+    let mut cmd;
+    cmd = Command::new("spaced")
         .version("0.1.0")
         .author("Matthew Toohey <contact@mtoohey.com>")
         .about("Spaced repetition in YAML")
@@ -21,23 +25,7 @@ pub fn build_cli() -> Command<'static> {
                         )
                         .arg(Arg::new("PATH").index(1)),
                 ),
-        )
-        .subcommand(
-            Command::new("import")
-                .alias("i")
-                .about("Import from other formats")
-                .arg(
-                    Arg::new("format")
-                        .short('f')
-                        .long("format")
-                        .help("The format of the file to import")
-                        .takes_value(true)
-                        .required(true)
-                        .possible_values(&["mochi", "anki"]),
-                )
-                .arg(Arg::new("PATH").index(1).required(true))
-                .arg(Arg::new("OUT_DIR").index(2).required(true)),
-        )
+        )       
         .subcommand(
             Command::new("notes")
                 .alias("n")
@@ -72,5 +60,25 @@ pub fn build_cli() -> Command<'static> {
                         ]),
                 )
                 .arg(Arg::new("PATH").index(1)),
-        )
+        );
+        #[cfg(feature = "import")]
+        {
+            cmd = cmd.subcommand(
+                Command::new("import")
+                .alias("i")
+                .about("Import from other formats")
+                .arg(
+                    Arg::new("format")
+                    .short('f')
+                    .long("format")
+                    .help("The format of the file to import")
+                    .takes_value(true)
+                    .required(true)
+                    .possible_values(&["mochi", "anki"]),
+                )
+                .arg(Arg::new("PATH").index(1).required(true))
+                .arg(Arg::new("OUT_DIR").index(2).required(true)),
+            );
+        }
+        cmd
 }
