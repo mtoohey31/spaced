@@ -92,9 +92,10 @@ ON cards.nid=notes.id"),
             .split("\u{1f}")
             .collect::<Vec<&str>>()
             .join("\n\n---\n\n");
-        let modified = row.2?;
+        // let modified = row.2?;
         cards.push(Card {
             created: Utc::now(),
+            // TODO: support fudging file modification times
             // updated: Utc::now().timezone().timestamp_millis(modified * 1000),
             reviews: get_reviews(id, conn)?,
             body,

@@ -56,7 +56,7 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
         let stdout = MouseTerminal::from(stdout);
         let stdout = AlternateScreen::from(stdout);
         let backend = TermionBackend::new(stdout);
-        let mut terminal = Terminal::new(backend).unwrap();
+        let mut terminal = Box::new(Terminal::new(backend).unwrap());
 
         let mut bottomless = Borders::ALL;
         bottomless.remove(Borders::BOTTOM);
@@ -66,7 +66,8 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
         let mut topless = Borders::ALL;
         topless.remove(Borders::TOP);
 
-        let mut draw = |cards: &Vec<DirEntry>| {
+        // TODO: idk how this works
+        let mut draw: Box<dyn FnMut(&Vec<DirEntry>) -> ()> = Box::new(|cards: &Vec<DirEntry>| {
             terminal
                 .draw(|frame| {
                     let chunks = Layout::default()
@@ -119,8 +120,8 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
                     frame.render_widget(card, chunks[1]);
                     frame.render_widget(hints, chunks[2]);
                 })
-                .unwrap()
-        };
+                .unwrap();
+        });
 
         draw(&cards);
 

@@ -11,6 +11,7 @@
 // TODO: display path when reviewing card
 // TODO: support `.spacedignore` files (this could be a separate crate if some else hasn't already done it)
 // TODO: support `.spacedhistory` for stats purposes
+// TODO: display time taken so far
 
 mod cli;
 mod entities;

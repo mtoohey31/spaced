@@ -1,6 +1,4 @@
-extern crate clap;
-
-use clap::Shell;
+use clap_complete::{generate_to, Shell};
 use std::env;
 
 include!("src/cli.rs");
@@ -10,9 +8,15 @@ fn main() {
         None => return,
         Some(outdir) => outdir,
     };
-    let mut app = build_cli();
+    let cmd = build_cli();
     let target_shells = [Shell::Bash, Shell::Zsh, Shell::Fish, Shell::PowerShell];
     for shell in target_shells {
-        app.gen_completions("spaced", shell, outdir.clone());
+        generate_to(
+            shell,
+            &mut cmd.clone(),
+            cmd.get_name().to_string(),
+            outdir.clone(),
+        )
+        .expect(&format!("Failed to generate completions for {}", shell));
     }
 }
