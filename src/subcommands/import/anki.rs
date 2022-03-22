@@ -73,15 +73,14 @@ fn get_cards(
     let mut statement = conn.prepare(
         &(String::from(
             "SELECT cards.id, notes.flds, notes.mod
-FROM (SELECT * FROM cards WHERE cards.did=",
-        ) + did
-            + ") as cards
-LEFT JOIN notes
-ON cards.nid=notes.id"),
+FROM cards
+LEFT JOIN notes ON cards.nid=notes.id
+WHERE cards.did = ?",
+        )),
     )?;
 
     let card_rows = statement
-        .query_map([], |row| Ok((row.get(0), row.get(1), row.get(2))))?
+        .query_map([did], |row| Ok((row.get(0), row.get(1), row.get(2))))?
         .collect::<Vec<Result<(Result<isize, _>, Result<String, _>, Result<i64, _>), _>>>();
     let mut cards = Vec::new();
     for row in card_rows {
