@@ -8,6 +8,8 @@ use crossterm::{
         LeaveAlternateScreen,
     },
 };
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::{
     env,
     error::Error,
@@ -227,12 +229,18 @@ fn print_card(
 ) -> Result<(), io::Error> {
     execute!(stdout, cursor::MoveTo(0, 1))?;
     execute!(stdout, Clear(ClearType::FromCursorDown))?;
+    lazy_static! {
+        static ref RE: Regex = Regex::new("<!--([^-]|-[^-]|--[^>])*-->(\r\n){0,2}").unwrap();
+    }
     write!(
         stdout,
         "{}",
-        components[..component + 1]
-            .join("\n---\n")
-            .replace("\n", "\r\n")
+        RE.replace_all(
+            &components[..component + 1]
+                .join("\n---\n")
+                .replace("\n", "\r\n"),
+            ""
+        )
     )
 }
 
