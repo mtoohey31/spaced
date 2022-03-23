@@ -52,7 +52,6 @@ pub fn review(matches: Option<&clap::ArgMatches>) -> Result<(), Box<dyn Error>> 
     let mut forgotten = 0;
     let mut component = 0;
     let card = frontmatter::read_body(&cards[0].path())?;
-    println!("{}", card);
     let mut components: Vec<String> = card.split("\n---\n").map(|s| s.to_string()).collect();
     let mut undo_stack = Vec::new();
 
