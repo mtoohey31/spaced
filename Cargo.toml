@@ -15,6 +15,7 @@ clap_complete = "~3"
 [dependencies]
 regex = "1"
 lazy_static = "1"
+textwrap = { version = "0.15", features = ["terminal_size"] }
 crossterm = "0.23"
 clap = "~3"
 walkdir = "2"

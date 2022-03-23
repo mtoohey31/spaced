@@ -17,6 +17,8 @@
 // with intelligent detection of whether there are globs so that `cards` and `notes` aren't
 // hardcoded subdirectory names
 // TODO: re-add printed stats after review
+// TODO: fix assumption of \n line endings
+#![feature(iter_intersperse)]
 
 mod cli;
 mod entities;

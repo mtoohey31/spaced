@@ -16,6 +16,7 @@ use std::{
     io::{self, Write},
     process::Command,
 };
+use textwrap::{wrap, Options};
 use walkdir::DirEntry;
 
 use crate::entities::{cards, frontmatter};
@@ -230,18 +231,16 @@ fn print_card(
     execute!(stdout, cursor::MoveTo(0, 1))?;
     execute!(stdout, Clear(ClearType::FromCursorDown))?;
     lazy_static! {
-        static ref RE: Regex = Regex::new("<!--([^-]|-[^-]|--[^>])*-->(\r\n){0,2}").unwrap();
+        static ref RE: Regex = Regex::new("<!--([^-]|-[^-]|--[^>])*-->\n{0,2}").unwrap();
     }
-    write!(
-        stdout,
-        "{}",
-        RE.replace_all(
-            &components[..component + 1]
-                .join("\n---\n")
-                .replace("\n", "\r\n"),
-            ""
-        )
-    )
+    let joined = components[..component + 1].join("\n---\n");
+    let raw = RE.replace_all(&joined, "");
+    let lines: String = raw
+        .split("\n")
+        .map(|line| wrap(line, Options::with_termwidth()).join("\r\n"))
+        .intersperse("\r\n".to_string())
+        .collect();
+    write!(stdout, "{}", lines)
 }
 
 // TODO: turn this progress bar into its own crate with support for non-tui applications as well as
