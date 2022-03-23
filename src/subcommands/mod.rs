@@ -3,7 +3,6 @@ mod cards;
 mod import;
 mod notes;
 mod review;
-mod ui;
 
 pub use cards::cards;
 #[cfg(feature = "import")]

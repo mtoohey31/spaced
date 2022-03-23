@@ -1,31 +1,39 @@
-use std::cell::RefCell;
-use std::io;
-use std::time::SystemTime;
-use termion::{
-    event::Key,
-    input::{MouseTerminal, TermRead},
-    raw::IntoRawMode,
-    screen::AlternateScreen,
-    style,
+use crossterm::{
+    cursor,
+    event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
+    execute,
+    style::Stylize,
+    terminal::{
+        disable_raw_mode, enable_raw_mode, size, Clear, ClearType, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
 };
-use tui::{
-    backend::TermionBackend,
-    layout::{Alignment, Constraint, Direction, Layout},
-    style::Color,
-    widgets::{Block, Borders, Gauge, Paragraph},
-    Terminal,
+use std::{
+    env,
+    error::Error,
+    io::{self, Write},
+    process::Command,
 };
 use walkdir::DirEntry;
 
 use crate::entities::{cards, frontmatter};
 
+const BOX_EMPTY: &str = " ";
+const BOX_FULL: &str = "█";
+const BOX_LEFT: [&str; 8] = [BOX_EMPTY, "▏", "▎", "▍", "▌", "▋", "▊", "▉"];
+const BOX_RIGHT: [&str; 8] = [BOX_EMPTY, "▕", "🮇", "🮈", "▐", "🮉", "🮊", "🮋"];
+
 enum UndoItem {
-    Mark(DirEntry, bool),
-    MarkArchived(DirEntry, bool),
+    MarkRemembered(DirEntry),
+    MarkForgotten,
+    MarkArchived(DirEntry),
     Skip,
 }
 
-pub fn review(matches: Option<&clap::ArgMatches>) {
+// TODO: create a library and refactor the list of cards into a circular linked list for better
+// performance
+// TODO: handle foresable errors such as reading card bodies better
+pub fn review(matches: Option<&clap::ArgMatches>) -> Result<(), Box<dyn Error>> {
     let (path, algorithm) = match matches {
         Some(m) => (
             m.value_of("PATH").unwrap_or("."),
@@ -35,202 +43,346 @@ pub fn review(matches: Option<&clap::ArgMatches>) {
     };
 
     let mut cards = cards::get_cards(path, algorithm);
-    let mut undo_stack = Vec::new();
 
     if cards.len() == 0 {
-        eprintln!("No cards found to review");
-        return;
+        return Ok(());
     }
 
-    // TODO: refactor into atomic integers
-    let remembered_cards = RefCell::new(0);
-    let forgotten_cards = RefCell::new(0);
-    let curr_side = RefCell::new(0);
-    let num_sides = RefCell::new(0);
+    let mut remembered = 0;
+    let mut forgotten = 0;
+    let mut component = 0;
+    let card = frontmatter::read_body(&cards[0].path())?;
+    println!("{}", card);
+    let mut components: Vec<String> = card.split("\n---\n").map(|s| s.to_string()).collect();
+    let mut undo_stack = Vec::new();
 
-    let start_time = SystemTime::now();
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
 
-    {
-        let stdin = io::stdin();
-        let stdout = io::stdout().into_raw_mode().unwrap();
-        let stdout = MouseTerminal::from(stdout);
-        let stdout = AlternateScreen::from(stdout);
-        let backend = TermionBackend::new(stdout);
-        let mut terminal = Box::new(Terminal::new(backend).unwrap());
+    print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+    print_card(&mut stdout, component, &components)?;
+    stdout.flush()?;
 
-        let mut bottomless = Borders::ALL;
-        bottomless.remove(Borders::BOTTOM);
-        let mut topbottomless = Borders::ALL;
-        topbottomless.remove(Borders::TOP);
-        topbottomless.remove(Borders::BOTTOM);
-        let mut topless = Borders::ALL;
-        topless.remove(Borders::TOP);
-
-        // TODO: idk how this works
-        let mut draw: Box<dyn FnMut(&Vec<DirEntry>) -> ()> = Box::new(|cards: &Vec<DirEntry>| {
-            terminal
-                .draw(|frame| {
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints(
-                            [
-                                Constraint::Length(2),
-                                Constraint::Length(frame.size().height - 4),
-                                Constraint::Length(2),
-                            ]
-                            .as_ref(),
-                        )
-                        .split(frame.size());
-
-                    let numerator = *remembered_cards.borrow() + *forgotten_cards.borrow();
-                    let denominator = cards.len() + numerator;
-                    let progress = Gauge::default()
-                        .block(Block::default().title(" spaced ").borders(bottomless))
-                        .ratio(numerator as f64 / denominator as f64)
-                        .gauge_style(tui::style::Style::default().fg(Color::Green))
-                        .label(format!("{}/{}", numerator, denominator,));
-
-                    let dir_entry: &DirEntry = &cards[0];
-                    // TODO: Handle errors here
-                    let body = frontmatter::read_body(dir_entry.path()).unwrap();
-                    let mut sides = body.split("\n---\n").collect::<Vec<&str>>();
-                    *num_sides.borrow_mut() = sides.len();
-                    sides = sides
-                        .drain(0..(*curr_side.borrow() + 1))
-                        .into_iter()
-                        .collect();
-                    // TODO: Parse markdown here
-                    // TODO: Center markdown and be smart about where it breaks to keep borders on
-                    // all sides as close to equal as possible
-                    // TODO: Handle scrolling and scroll to bottom by default
-                    let card = Paragraph::new(sides.join("\n---\n"))
-                        .block(Block::default().borders(topbottomless));
-
-                    let hint_string;
-                    if *curr_side.borrow() + 1 == *num_sides.borrow() {
-                        hint_string = "[f]orgot [space] remembered [l] skip [a]rchive [q]uit";
-                    } else {
-                        hint_string = "[f]orgot [space] flip [l] skip [a]rchive [q]uit";
+    loop {
+        match read()? {
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('q'),
+                modifiers: KeyModifiers { .. },
+            }) => break,
+            Event::Key(KeyEvent {
+                code: KeyCode::Char(' '),
+                modifiers: KeyModifiers { .. },
+            }) => {
+                if component == components.len() - 1 {
+                    remembered += 1;
+                    cards::mark(cards[0].path(), true);
+                    undo_stack.push(UndoItem::MarkRemembered(cards.remove(0)));
+                    if cards.len() == 0 {
+                        break;
                     }
-                    let hints = Paragraph::new(hint_string)
-                        .block(Block::default().borders(topless))
-                        .alignment(Alignment::Center);
 
-                    frame.render_widget(progress, chunks[0]);
-                    frame.render_widget(card, chunks[1]);
-                    frame.render_widget(hints, chunks[2]);
-                })
-                .unwrap();
-        });
+                    component = 0;
+                    let card = frontmatter::read_body(&cards[0].path())?;
+                    components = card.split("\n---\n").map(|s| s.to_string()).collect();
+                    print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+                    print_card(&mut stdout, component, &components)?;
+                } else {
+                    component += 1;
+                    print_card(&mut stdout, component, &components)?;
+                }
+                stdout.flush()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('s'),
+                modifiers: KeyModifiers { .. },
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Char('l'),
+                modifiers: KeyModifiers { .. },
+            }) => {
+                let card = cards.remove(0);
+                cards.push(card);
+                undo_stack.push(UndoItem::Skip);
 
-        draw(&cards);
+                component = 0;
+                let card = frontmatter::read_body(&cards[0].path())?;
+                components = card.split("\n---\n").map(|s| s.to_string()).collect();
+                print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+                print_card(&mut stdout, component, &components)?;
+                stdout.flush()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('f'),
+                modifiers: KeyModifiers { .. },
+            }) => {
+                forgotten += 1;
+                let card = cards.remove(0);
+                cards::mark(card.path(), false);
+                cards.push(card);
+                undo_stack.push(UndoItem::MarkForgotten);
 
-        for event in stdin.events() {
-            match event.unwrap() {
-                termion::event::Event::Key(key) => match key {
-                    Key::Char('q') => break,
-                    Key::Char('e') => {} // TODO: Implement this
-                    Key::Char('l') => {
-                        *curr_side.borrow_mut() = 0;
-                        let card = cards.remove(0);
-                        cards.push(card);
-                        undo_stack.push(UndoItem::Skip);
-                    }
-                    Key::Char(' ') => {
-                        if *curr_side.borrow() + 1 == *num_sides.borrow() {
-                            cards::mark(cards[0].path(), true);
-                            *curr_side.borrow_mut() = 0;
-                            *remembered_cards.borrow_mut() += 1;
-                            undo_stack.push(UndoItem::Mark(cards.remove(0), true));
-                        } else {
-                            *curr_side.borrow_mut() += 1;
+                component = 0;
+                let card = frontmatter::read_body(&cards[0].path())?;
+                components = card.split("\n---\n").map(|s| s.to_string()).collect();
+                print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+                print_card(&mut stdout, component, &components)?;
+                stdout.flush()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('a'),
+                modifiers: KeyModifiers { .. },
+            }) => {
+                let card = cards.remove(0);
+                if cards.len() == 0 {
+                    break;
+                }
+                undo_stack.push(UndoItem::MarkArchived(card));
+
+                component = 0;
+                let card = frontmatter::read_body(&cards[0].path())?;
+                components = card.split("\n---\n").map(|s| s.to_string()).collect();
+                print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+                print_card(&mut stdout, component, &components)?;
+                stdout.flush()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('u'),
+                modifiers: KeyModifiers { .. },
+            }) => {
+                if let Some(undo_item) = undo_stack.pop() {
+                    match undo_item {
+                        UndoItem::MarkRemembered(c) => {
+                            remembered -= 1;
+                            cards::unmark(c.path());
+                            cards.insert(0, c);
+                        }
+                        UndoItem::MarkForgotten => {
+                            forgotten -= 1;
+                            let card = cards.pop().unwrap();
+                            cards::unmark(card.path());
+                            cards.insert(0, card);
+                        }
+                        UndoItem::MarkArchived(c) => {
+                            cards::mark_archived(c.path(), false);
+                            cards.insert(0, c);
+                        }
+                        UndoItem::Skip => {
+                            let card = cards.pop().unwrap();
+                            cards.insert(0, card);
                         }
                     }
-                    Key::Char('f') => {
-                        cards::mark(cards[0].path(), false);
-                        *curr_side.borrow_mut() = 0;
-                        *forgotten_cards.borrow_mut() += 1;
-                        undo_stack.push(UndoItem::Mark(cards.remove(0), false));
-                    }
-                    Key::Char('a') => {
-                        cards::mark_archived(cards[0].path(), true);
-                        *curr_side.borrow_mut() = 0;
-                        undo_stack.push(UndoItem::MarkArchived(cards.remove(0), false));
-                    }
-                    Key::Char('u') => match undo_stack.pop() {
-                        Some(undo_item) => match undo_item {
-                            UndoItem::Mark(entry, remembered) => {
-                                cards::unmark(entry.path());
-                                if remembered {
-                                    *remembered_cards.borrow_mut() -= 1;
-                                } else {
-                                    *forgotten_cards.borrow_mut() -= 1;
-                                }
-                                cards.insert(0, entry);
-                            }
-                            UndoItem::MarkArchived(entry, archived) => {
-                                cards::mark_archived(entry.path(), !archived);
-                            }
-                            UndoItem::Skip => {
-                                let card = match cards.pop() {
-                                    Some(c) => c,
-                                    None => panic!("Mismatched cards and undo stack"),
-                                };
-                                cards.insert(0, card);
-                            }
-                        },
-                        None => {} // TODO: Inform user
-                    },
-                    _ => (),
-                },
-                _ => (),
-            }
-            if cards.len() == 0 {
-                break;
-            }
 
-            draw(&cards);
+                    component = 0;
+                    let card = frontmatter::read_body(&cards[0].path())?;
+                    components = card.split("\n---\n").map(|s| s.to_string()).collect();
+                    print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+                    print_card(&mut stdout, component, &components)?;
+                    stdout.flush()?;
+                }
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('e'),
+                modifiers: KeyModifiers { .. },
+            }) => {
+                execute!(stdout, LeaveAlternateScreen, cursor::Show)?;
+                disable_raw_mode()?;
+
+                // TODO: extract this code and the code for editing notes into a helper module
+                let editor = env::var("VISUAL")
+                    .unwrap_or(env::var("EDITOR").expect("please set $VISUAL or $EDITOR"));
+                Command::new(editor.clone())
+                    .args([cards[0].path().as_os_str()])
+                    .status()
+                    .expect(&format!("failed to execute {}", editor));
+
+                component = 0;
+                let card = frontmatter::read_body(&cards[0].path())?;
+                components = card.split("\n---\n").map(|s| s.to_string()).collect();
+
+                enable_raw_mode()?;
+                execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
+                print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+                print_card(&mut stdout, component, &components)?;
+                stdout.flush()?;
+            }
+            Event::Resize(..) => {
+                print_progress(&mut stdout, remembered, forgotten, cards.len())?;
+                print_card(&mut stdout, component, &components)?;
+                stdout.flush()?;
+            }
+            _ => (),
+        };
+    }
+
+    execute!(stdout, LeaveAlternateScreen, cursor::Show)?;
+    disable_raw_mode()?;
+    Ok(())
+}
+
+// TODO: add alternate implementation using configurable pandoc feature here with prettier printing
+fn print_card(
+    stdout: &mut io::Stdout,
+    component: usize,
+    components: &Vec<String>,
+) -> Result<(), io::Error> {
+    execute!(stdout, cursor::MoveTo(0, 1))?;
+    execute!(stdout, Clear(ClearType::FromCursorDown))?;
+    write!(
+        stdout,
+        "{}",
+        components[..component + 1]
+            .join("\n---\n")
+            .replace("\n", "\r\n")
+    )
+}
+
+// TODO: turn this progress bar into its own crate with support for non-tui applications as well as
+// different progress alignment and support for multiple data types such as time and storage units.
+// if we want to get real fancy, we could support animations so it's even smoother
+// check if there's already a good rust progress bar library, cause maybe I could contribute to
+// that as an added double ended feature
+fn print_progress(
+    stdout: &mut io::Stdout,
+    remembered: usize,
+    forgotten: usize,
+    incomplete: usize,
+) -> Result<(), Box<dyn Error>> {
+    let (cols, _) = size()?;
+    let cols = cols as usize;
+
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+
+    let r_bar_length = (remembered as f32 / (remembered + incomplete) as f32) * cols as f32;
+    let r_floored_length = r_bar_length.floor();
+    let r_remainder = r_bar_length - r_floored_length;
+    let r_floored_length = r_floored_length as usize;
+
+    let f_bar_length = (forgotten as f32 / (remembered + incomplete) as f32) * cols as f32;
+    let f_floored_length = f_bar_length.floor();
+    let f_remainder = f_bar_length - f_floored_length;
+    let f_floored_length = f_floored_length as usize;
+
+    let text = format!("{}/{}", remembered, (remembered + incomplete));
+    let text_len = text.len();
+    let text_pos = ((cols - text_len) as f32 / 2_f32).ceil() as usize;
+    let text_range = text_pos..text_pos + text_len;
+
+    if r_floored_length + f_floored_length >= cols - 1 {
+        if r_floored_length < text_range.start {
+            write!(
+                stdout,
+                "{}{}{}{}{}",
+                BOX_FULL.repeat(r_floored_length).green(),
+                BOX_LEFT[(r_remainder * 8_f32) as usize].green().on_red(),
+                BOX_FULL
+                    .repeat(text_range.start - r_floored_length - 1)
+                    .red(),
+                text.on_red(),
+                BOX_FULL.repeat(cols - text_range.end).red()
+            )?
+        } else if text_range.contains(&r_floored_length) {
+            let r_length = r_floored_length + (r_remainder.round() as usize);
+            write!(
+                stdout,
+                "{}{}{}{}",
+                BOX_FULL.repeat(text_range.start).green(),
+                text[..r_length - text_range.start].on_green(),
+                text[r_length - text_range.start..].on_red(),
+                BOX_FULL.repeat(cols - text_range.end).red()
+            )?
+        } else {
+            write!(
+                stdout,
+                "{}{}{}{}{}",
+                BOX_FULL.repeat(text_range.start).green(),
+                text.on_green(),
+                BOX_FULL.repeat(r_floored_length - text_range.end).green(),
+                BOX_LEFT[(r_remainder * 8_f32) as usize].green().on_red(),
+                BOX_FULL.repeat(cols - r_floored_length - 1).red()
+            )?
+        }
+    } else {
+        if cols - f_floored_length <= text_range.start {
+            write!(
+                stdout,
+                "{}{}{}{}{}{}{}",
+                BOX_FULL.repeat(r_floored_length).green(),
+                BOX_LEFT[(r_remainder * 8_f32) as usize].green(),
+                BOX_EMPTY.repeat(cols - r_floored_length - f_floored_length - 2),
+                BOX_RIGHT[(f_remainder * 8_f32) as usize].red(),
+                BOX_FULL
+                    .repeat(text_range.start - (cols - f_floored_length))
+                    .red(),
+                text.on_red(),
+                BOX_FULL.repeat(cols - text_range.end).red(),
+            )?;
+        } else if text_range.contains(&(cols - f_floored_length - 1))
+            && !text_range.contains(&r_floored_length)
+        {
+            let f_length = f_floored_length + (f_remainder.round() as usize);
+            write!(
+                stdout,
+                "{}{}{}{}{}{}",
+                BOX_FULL.repeat(r_floored_length).green(),
+                BOX_LEFT[(r_remainder * 8_f32) as usize].green(),
+                BOX_EMPTY.repeat(text_range.start - r_floored_length - 1),
+                &text[..cols - f_length - text_range.start],
+                text[cols - f_length - text_range.start..].on_red(),
+                BOX_FULL.repeat(cols - text_range.end).red(),
+            )?;
+        } else if text_range.contains(&(cols - f_floored_length - 1))
+            && text_range.contains(&r_floored_length)
+        {
+            let r_length = r_floored_length + (r_remainder.round() as usize);
+            let f_length = f_floored_length + (f_remainder.round() as usize);
+            write!(
+                stdout,
+                "{}{}{}{}{}",
+                BOX_FULL.repeat(text_range.start).green(),
+                text[..r_length - text_range.start].on_green(),
+                &text[r_length - text_range.start..cols - f_length - text_range.start],
+                text[cols - f_length - text_range.start..].on_red(),
+                BOX_FULL.repeat(cols - text_range.end).red(),
+            )?;
+        } else if r_floored_length < text_range.start {
+            write!(
+                stdout,
+                "{}{}{}{}{}{}{}",
+                BOX_FULL.repeat(r_floored_length).green(),
+                BOX_LEFT[(r_remainder * 8_f32) as usize].green(),
+                BOX_EMPTY.repeat(text_range.start - r_floored_length - 1),
+                text,
+                BOX_EMPTY.repeat((cols - f_floored_length - 1) - text_range.end),
+                BOX_RIGHT[(f_remainder * 8_f32) as usize].red(),
+                BOX_FULL.repeat(f_floored_length).red()
+            )?
+        } else if text_range.contains(&r_floored_length) {
+            let r_length = r_floored_length + (r_remainder.round() as usize);
+            write!(
+                stdout,
+                "{}{}{}{}{}{}",
+                BOX_FULL.repeat(text_range.start).green(),
+                text[..r_length - text_range.start].on_green(),
+                &text[r_length - text_range.start..],
+                BOX_EMPTY.repeat((cols - f_floored_length - 1) - text_range.end),
+                BOX_RIGHT[(f_remainder * 8_f32) as usize].red(),
+                BOX_FULL.repeat(f_floored_length).red()
+            )?
+        } else {
+            write!(
+                stdout,
+                "{}{}{}{}{}{}{}",
+                BOX_FULL.repeat(text_range.start).green(),
+                text.on_green(),
+                BOX_FULL.repeat(r_floored_length - text_range.end).green(),
+                BOX_LEFT[(r_remainder * 8_f32) as usize].green(),
+                BOX_EMPTY.repeat(cols - r_floored_length - f_floored_length - 2),
+                BOX_RIGHT[(f_remainder * 8_f32) as usize].red(),
+                BOX_FULL.repeat(f_floored_length).red()
+            )?
         }
     }
 
-    // TODO: Color code facts by how good they are
-    println!("{}# Recap{}\n", style::Bold, style::Reset);
-    let total = *remembered_cards.borrow() + *forgotten_cards.borrow();
-    match start_time.elapsed() {
-        Ok(e) => {
-            let elapsed = e.as_secs_f64();
-            let duration: f64;
-            let unit: &str;
-            if elapsed > 60_f64 {
-                if elapsed > 3600_f64 {
-                    duration = (elapsed / 360_f64).round() / 10_f64;
-                    if duration == 1_f64 {
-                        unit = "hour";
-                    } else {
-                        unit = "hours";
-                    }
-                } else {
-                    duration = (elapsed / 6_f64).round() / 10_f64;
-                    if duration == 1_f64 {
-                        unit = "minute";
-                    } else {
-                        unit = "minutes";
-                    }
-                }
-            } else {
-                duration = (10_f64 * elapsed).round() / 10_f64;
-                if duration == 1_f64 {
-                    unit = "second";
-                } else {
-                    unit = "seconds";
-                }
-            }
-            println!("• Reviewed {} cards in {} {}", total, duration, unit)
-        }
-        Err(_) => println!("• Reviewed {} cards", total),
-    }
-    println!(
-        "• Remembered {}% of cards",
-        (1000_f64 * *remembered_cards.borrow() as f64 / total.max(1) as f64).round() / 10_f64
-    );
+    Ok(())
 }

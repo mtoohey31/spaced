@@ -1,7 +1,7 @@
 use crate::entities::frontmatter;
+use crossterm::style::Stylize;
 use serde_yaml::Value;
 use std::io::{self, Write};
-use termion::{color, style};
 
 use crate::entities::cards;
 
@@ -35,11 +35,8 @@ fn cards_clear_history(matches: Option<&clap::ArgMatches>) {
 
     if !no_confirm {
         println!(
-            "{}{}# Warning, history will be cleared for...{}{}\n",
-            style::Bold,
-            color::Fg(color::Red),
-            style::Reset,
-            color::Fg(color::Reset)
+            "{}",
+            "# Warning, history will be cleared for...\n".bold().red()
         );
     }
 
@@ -57,11 +54,7 @@ fn cards_clear_history(matches: Option<&clap::ArgMatches>) {
                 "Y\n" | "y\n" | "YES\n" | "Yes\n" | "yes\n" => break,
                 "\n" | "N\n" | "n\n" | "NO\n" | "No\n" | "no\n" => return,
                 _ => {
-                    eprintln!(
-                        "{}Invalid input, please try again{}",
-                        color::Fg(color::Red),
-                        color::Fg(color::Reset)
-                    );
+                    eprintln!("{}", "Invalid input, please try again{}".red());
                     continue;
                 }
             },

@@ -31,12 +31,12 @@ pub fn notes(matches: Option<&clap::ArgMatches>) {
     }
 
     if edit {
-        Command::new(
-            env::var("VISUAL").unwrap_or(env::var("EDITOR").unwrap_or(String::from("vim"))),
-        )
-        .args(entries.iter().map(|e| e.path().as_os_str()))
-        .status()
-        .expect("failed to execute $VISUAL, $EDITOR, or vim command");
+        let editor = env::var("VISUAL")
+            .unwrap_or(env::var("EDITOR").expect("please set $VISUAL or $EDITOR"));
+        Command::new(editor.clone())
+            .args(entries.iter().map(|e| e.path().as_os_str()))
+            .status()
+            .expect(&format!("failed to execute {}", editor));
     } else {
         for entry in entries {
             println!("{}", entry.path().display());

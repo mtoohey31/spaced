@@ -12,6 +12,11 @@
 // TODO: support `.spacedignore` files (this could be a separate crate if some else hasn't already done it)
 // TODO: support `.spacedhistory` for stats purposes
 // TODO: display time taken so far
+// TODO: unify error handling
+// TODO: add config file support and allow for location arguments in notes and review subcommands
+// with intelligent detection of whether there are globs so that `cards` and `notes` aren't
+// hardcoded subdirectory names
+// TODO: re-add printed stats after review
 
 mod cli;
 mod entities;
@@ -27,7 +32,7 @@ fn main() {
         #[cfg(feature = "import")]
         Some("import") => import(matches.subcommand_matches("import").unwrap()), // Can be unwrapped safely because clap will ensure the format argument is present
         Some("notes") => notes(matches.subcommand_matches("notes")),
-        Some("review") | None => review(matches.subcommand_matches("review")),
-        _ => panic!(), // Cannot occur since no other subcommands are specified in ../cli.yaml
+        Some("review") | None => review(matches.subcommand_matches("review")).unwrap(), // TODO: make all subcommands return results and handle them here
+        _ => panic!(), // Cannot occur since no other subcommands are specified
     }
 }
