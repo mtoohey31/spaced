@@ -1,8 +1,9 @@
+
 # `spaced`
 
 Command line, spaced repetition software using markdown.
 
-![screenshot](https://user-images.githubusercontent.com/36740602/134814105-44cbda7e-5dd2-4c90-a480-7aab2d0b5731.png)
+![screenshot](https://user-images.githubusercontent.com/36740602/165877803-6e252b1d-b769-4ed3-b006-ee63ab6579c4.png)
 
 ## Features
 
