@@ -5,16 +5,29 @@ edition = "2021"
 build = "build.rs"
 
 [features]
-default = ["import"]
-import = ["serde_json", "rusqlite", "zip", "try_map"]
+# default = ["import"]
+default = ["import", "pandoc"]
+import = ["dep:serde_json", "dep:rusqlite", "dep:zip", "dep:try_map"]
+pandoc = [
+  "dep:serde_json",
+  "dep:pandoc",
+  "dep:pandoc_types",
+  "dep:syntect",
+  "dep:bincode",
+  "dep:septem",
+]
 
 [build-dependencies]
 clap = "~3"
 clap_complete = "~3"
+syntect = { version = "4", optional = true }
+bincode = { version = "1", optional = true }
 
 [dependencies]
 regex = "1"
 lazy_static = "1"
+# TODO: figure out how to disable this when pandoc is enabled if it's not being
+# used there
 textwrap = { version = "0.15", features = ["terminal_size"] }
 crossterm = "0.23"
 clap = "~3"
@@ -27,3 +40,7 @@ serde_json = { version = "1.0", optional = true }
 rusqlite = { version = "0.27", optional = true }
 zip = { version = "0.6", optional = true }
 try_map = { version = "0.3", optional = true }
+pandoc = { version = "0.8", optional = true }
+pandoc_types = { version = "0.5", optional = true }
+syntect = { version = "4", optional = true }
+septem = { version = "1", optional = true }

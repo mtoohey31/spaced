@@ -18,7 +18,9 @@
 // hardcoded subdirectory names
 // TODO: re-add printed stats after review
 // TODO: fix assumption of \n line endings
+// TODO: rename to spc after the current refactor
 #![feature(iter_intersperse)]
+#![feature(generic_arg_infer)]
 
 mod cli;
 mod entities;
