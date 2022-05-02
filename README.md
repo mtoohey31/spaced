@@ -24,7 +24,12 @@ Command line, spaced repetition software using markdown.
 cargo install --git https://github.com/mtoohey31/spaced
 ```
 
-The import feature adds an extra ~73 dependencies for handling various file formats, so if you don't need it you can opt out by adding the `--no-default-features` flag to the install command.
+### Features
+
+By default only `import` is enabled. If you want to customize the features that are installed, the flags `--all-features`, `--no-default-features` and `--features` for the `cargo install` subcommand may come in handy. Their usage is explained in more detail in the man page for `cargo-install`.
+
+- `import`: adds import subcommand and adds about ~73 dependencies for dealing with a variety of file formats
+- `pandoc`: prettifies output using [pandoc](https://pandoc.org/); requires `pandoc` to be installed and available on your `$PATH`
 
 ## Usage
 
