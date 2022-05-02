@@ -20,7 +20,7 @@
           channel = "nightly";
           sha256 = "m+Yg171wVTSr4Q04fe5KY3fL6RRmk855j/e0kqObW2M=";
         };
-        rust = rustChannel.rust;
+        inherit (rustChannel) rust;
 
         naersk-lib = naersk.lib."${system}".override {
           cargo = rust;
@@ -28,15 +28,14 @@
         };
       in
       rec {
-        packages.spaced = naersk-lib.buildPackage {
+        packages.default = naersk-lib.buildPackage {
           pname = "spaced";
           root = ./.;
 
           nativeBuildInputs = [ pkgs.sqlite ];
         };
-        defaultPackage = packages.spaced;
 
-        devShell = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           nativeBuildInputs = [ rust pkgs.sqlite pkgs.rust-analyzer pkgs.pandoc ];
           shellHook = ''
             export RUST_SRC_PATH="${rustChannel.rust-src}/lib/rustlib/src/rust/library"
