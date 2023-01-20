@@ -59,6 +59,7 @@ pub fn build_cli() -> Command<'static> {
                             // "super-memo"
                         ]),
                 )
+                .arg(Arg::new("no-shuffle").short('S').long("no-shuffle"))
                 .arg(Arg::new("PATH").index(1)),
         );
         #[cfg(feature = "import")]

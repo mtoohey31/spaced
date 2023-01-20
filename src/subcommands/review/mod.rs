@@ -9,6 +9,7 @@ use crossterm::{
     },
 };
 use lazy_static::lazy_static;
+use rand::{seq::SliceRandom, thread_rng};
 use regex::Regex;
 use std::{
     env,
@@ -51,6 +52,9 @@ pub fn review(matches: Option<&clap::ArgMatches>) -> Result<(), Box<dyn Error>> 
     };
 
     let mut cards = cards::get_cards(path, algorithm);
+    if matches.map(|m| !m.is_present("no-shuffle")).unwrap_or(true) {
+        cards.shuffle(&mut thread_rng());
+    }
 
     if cards.len() == 0 {
         return Ok(());
