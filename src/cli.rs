@@ -40,7 +40,7 @@ pub fn build_cli() -> Command<'static> {
                     Arg::new("edit")
                         .short('e')
                         .long("edit")
-                        .help("Run one of $VISUAL, $EDITOR, or vim (with precedence in that rder) on all notes, if any are found"),
+                        .help("Run one of $VISUAL, $EDITOR, or vim (with precedence in that order) on all notes, if any are found"),
                 ),
         )
         .subcommand(
@@ -62,24 +62,24 @@ pub fn build_cli() -> Command<'static> {
                 .arg(Arg::new("no-shuffle").short('S').long("no-shuffle"))
                 .arg(Arg::new("PATH").index(1)),
         );
-        #[cfg(feature = "import")]
-        {
-            cmd = cmd.subcommand(
-                Command::new("import")
+    #[cfg(feature = "import")]
+    {
+        cmd = cmd.subcommand(
+            Command::new("import")
                 .alias("i")
                 .about("Import from other formats")
                 .arg(
                     Arg::new("format")
-                    .short('f')
-                    .long("format")
-                    .help("The format of the file to import")
-                    .takes_value(true)
-                    .required(true)
-                    .possible_values(&["mochi", "anki"]),
+                        .short('f')
+                        .long("format")
+                        .help("The format of the file to import")
+                        .takes_value(true)
+                        .required(true)
+                        .possible_values(&["mochi", "anki"]),
                 )
                 .arg(Arg::new("PATH").index(1).required(true))
                 .arg(Arg::new("OUT_DIR").index(2).required(true)),
-            );
-        }
-        cmd
+        );
+    }
+    cmd
 }
