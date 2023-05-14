@@ -1,3 +1,6 @@
+// TODO: remove this and the itertools dependency once intersperse_with isn't unstable
+#![allow(unstable_name_collisions)]
+
 use crossterm::{
     cursor,
     event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
@@ -8,6 +11,7 @@ use crossterm::{
         LeaveAlternateScreen,
     },
 };
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, thread_rng};
 use regex::Regex;

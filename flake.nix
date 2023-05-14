@@ -1,45 +1,53 @@
 {
+  description = "spaced";
+
   inputs = {
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";
     utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nix-community/naersk";
-    mozillapkgs = {
-      url = "github:mozilla/nixpkgs-mozilla";
-      flake = false;
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, utils, naersk, mozillapkgs }:
-    utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages."${system}";
-
-        mozilla = pkgs.callPackage (mozillapkgs + "/package-set.nix") { };
-        rustChannel = mozilla.rustChannelOf {
-          date = "2022-04-28";
-          channel = "nightly";
-          sha256 = "m+Yg171wVTSr4Q04fe5KY3fL6RRmk855j/e0kqObW2M=";
-        };
-        inherit (rustChannel) rust;
-
-        naersk-lib = naersk.lib."${system}".override {
-          cargo = rust;
-          rustc = rust;
-        };
-      in
-      rec {
-        packages.default = naersk-lib.buildPackage {
+  outputs = { self, nixpkgs, utils, naersk }: {
+    overlays = rec {
+      expects-naersk = final: _: {
+        spaced = final.naersk.buildPackage {
           pname = "spaced";
-          root = ./.;
-
-          nativeBuildInputs = [ pkgs.sqlite ];
+          root = builtins.path { path = ./.; name = "spaced-src"; };
+          nativeBuildInputs = [ final.sqlite ];
         };
+      };
 
-        devShells.default = pkgs.mkShell {
-          nativeBuildInputs = [ rust pkgs.sqlite pkgs.rust-analyzer pkgs.pandoc ];
-          shellHook = ''
-            export RUST_SRC_PATH="${rustChannel.rust-src}/lib/rustlib/src/rust/library"
-          '';
-        };
-      });
+      default = _: prev: {
+        inherit (prev.appendOverlays [
+          naersk.overlay
+          expects-naersk
+        ]) spaced;
+      };
+    };
+  } // utils.lib.eachDefaultSystem (system:
+    let
+      pkgs = import nixpkgs {
+        overlays = [ self.overlays.default ];
+        inherit system;
+      };
+      inherit (pkgs) cargo cargo-watch mkShell rust-analyzer rustc
+        rustfmt spaced sqlite;
+    in
+    {
+      packages.default = spaced;
+
+      devShells.default = mkShell {
+        packages = [
+          cargo
+          cargo-watch
+          rust-analyzer
+          rustc
+          rustfmt
+          sqlite
+        ];
+      };
+    });
 }
