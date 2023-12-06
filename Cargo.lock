@@ -589,9 +589,9 @@ dependencies = [
 
 [[package]]
 name = "pandoc_types"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3277cf3c81dc5fae4a0e77705896bfb95e53d31e5141b0ac65cbd441448eb38"
+checksum = "16172f24b8ad7f0ded9947f3d33f0344bc4d4e7c4937a2a0c405447403211434"
 dependencies = [
  "serde",
  "serde_tuple",

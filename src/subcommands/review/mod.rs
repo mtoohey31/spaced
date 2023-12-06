@@ -514,6 +514,12 @@ fn stringify_pandoc_block<'a>(
             .intersperse_with(|| Ok("\n\n".to_string()))
             .collect::<Result<String, _>>(),
         Block::Null => Ok("".to_string()),
+        // TODO: Look into how we can display this better.
+        Block::Figure(_, _, blocks) => blocks
+            .iter()
+            .map(stringify_pandoc_block)
+            .intersperse_with(|| Ok("\n\n".to_string()))
+            .collect::<Result<String, _>>(),
     }
 }
 
