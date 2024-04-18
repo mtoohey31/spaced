@@ -59,7 +59,7 @@ pub fn read_body(path: &Path) -> Result<String, Box<dyn Error>> {
 }
 
 fn consume_rest_text(line_iter: Consumable) -> Result<String, Box<dyn Error>> {
-    let rest = line_iter.collect::<Result<Vec<String>, _>>()?.join("\n");
+    let rest = line_iter.collect::<Result<Vec<String>, _>>()?.join("\n") + "\n";
     match rest.strip_prefix("\n") {
         Some(r) => Ok(String::from(r)),
         None => Ok(rest),
